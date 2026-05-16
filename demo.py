@@ -22,6 +22,10 @@ from resilient_llm import ResilientLLM, Scorecard, Target
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+# Silence the noisy httpx INFO log on every Groq POST — it crowds the screen
+# recording and adds nothing the resilience story needs.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
 
 
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "")

@@ -41,7 +41,7 @@ agent can still answer.
 ## Quick start
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/run58669-maker/resilient-agent.git
 cd resilient-agent
 pip install -r requirements.txt
 cp .env.example .env  # fill in GROQ_API_KEY + TFY_API_KEY
