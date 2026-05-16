@@ -1,0 +1,10 @@
+.env
+.env.local
+.tfy_pat.tmp
+
+__pycache__/
+*.pyc
+*.pyo
+
+# Reference repo we cloned for inspiration — not part of our submission
+voice_analyser_ref/
