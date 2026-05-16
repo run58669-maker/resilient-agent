@@ -130,4 +130,5 @@ it three ways:
    and per-target serve counts mean "did it work?" has a numeric answer.
 3. **Survival of the gateway itself**. Because the last target bypasses TF and
    talks directly to the provider, the agent answers even if the gateway is
-   the thing that's down. That's the strict reading of the challenge prompt.
+   the thing that's down. That's the strict reading of the challenge prompt
+   — and a path that disappears the moment you bind to a single endpoint.
