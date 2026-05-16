@@ -81,3 +81,45 @@ def chain_faults(*hooks):
         for h in hooks:
             h(tgt, attempt)
     return composed
+
+
+# ── MCP-specific faults ───────────────────────────────────────────────────── #
+# Same signature as the LLM hooks so they can be dropped into ResilientMCP.
+# Using duck-typed `target.name` rather than the Target type so this file
+# stays import-cycle-free.
+
+@dataclass
+class MCPToolFault:
+    """Simulate an MCP server returning an error for the next `count` calls.
+
+    This is the MCP-side counterpart to BurstFault: it raises before the
+    real streamable-http call is made, so ResilientMCP's retry / breaker /
+    fallback path is what answers — exactly the question the hackathon
+    challenge asks: 'How does your agent behave when an MCP server starts
+    erroring out?'"""
+    target_name: str
+    count: int
+    error_message: str = "mcp tool unavailable"
+    remaining: int = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.remaining = self.count
+
+    def __call__(self, tgt, attempt: int) -> None:
+        if tgt.name == self.target_name and self.remaining > 0:
+            self.remaining -= 1
+            raise RuntimeError(f"chaos: {self.error_message} ({self.remaining} left)")
+
+
+@dataclass
+class MCPTimeoutFault:
+    """Inject `latency_s` of artificial latency on first attempt only —
+    simulates a slow MCP server. ResilientMCP doesn't have a per-call timeout
+    yet (TODO), so for now this just shows up as elevated p95 in the scorecard
+    without flipping the breaker."""
+    target_name: str
+    latency_s: float = 2.0
+
+    def __call__(self, tgt, attempt: int) -> None:
+        if tgt.name == self.target_name and attempt == 1:
+            time.sleep(self.latency_s)

@@ -11,19 +11,19 @@ TrueFoundry Gateway itself going down.
 
 ## TL;DR
 
+The same resilience pattern is applied to **both** legs of the challenge
+prompt — LLM brownouts and MCP server errors — by two parallel classes
+that share Scorecard / breaker / retry plumbing:
+
 ```
-                   ┌─ ResilientLLM ───────────────────────────┐
-   user prompt ──▶ │  fallback chain → breaker → retry+backoff │ ──▶ response
-                   └──────────────────────────────────────────┘
-                          │            │            │
-                          ▼            ▼            ▼
-                  tfy-groq-8b   tfy-groq-70b   raw-groq-8b
-                   (TF Gateway)  (TF Gateway)  (direct provider)
-                          │            │            │
-                          └────────────┴────────────┘
-                                       ▼
-                            TrueFoundry Request Traces
-                            (every attempt visible)
+   ┌─ ResilientLLM ─────────────┐    ┌─ ResilientMCP ─────────────┐
+   │  retry → breaker → chain   │    │  retry → breaker → chain   │
+   └────────┬───────────────────┘    └────────┬───────────────────┘
+            ▼                                  ▼
+   tfy-groq-8b  tfy-groq-70b  raw-groq-8b      mcp-primary  mcp-fallback
+   (TF GW)      (TF GW)       (direct)         (port 8011)  (port 8012)
+            │                                   │
+            └─────────► TrueFoundry Request Traces ◄────── (LLM side)
 ```
 
 3 layers of defense, every attempt observable in the TF dashboard:
@@ -48,11 +48,24 @@ cp .env.example .env  # fill in GROQ_API_KEY + TFY_API_KEY
 python demo.py
 ```
 
-You'll see three scenarios run end-to-end:
+You'll see three LLM scenarios run end-to-end:
 
 1. **Clean baseline** — no chaos, primary serves everything
 2. **Burst chaos on primary** — primary hard-fails 4× → breaker opens → fallback to secondary
 3. **Gateway brownout** — 60% random failure on both TF targets → raw provider picks up
+
+Then run the MCP counterpart — two local MCP servers (primary + fallback) under
+the same resilience layer:
+
+```bash
+python demo_mcp.py
+```
+
+Three MCP-side scenarios:
+
+1. **Clean baseline** — primary MCP serves everything
+2. **Primary MCP errors out** — `MCPToolFault` raises 4× → breaker opens → fallback MCP picks up
+3. **Primary MCP brownout** — `MCPTimeoutFault` injects 2 s latency on first attempt
 
 Each scenario prints a **Resilience Scorecard**:
 
@@ -72,10 +85,14 @@ Each scenario prints a **Resilience Scorecard**:
 ## Files
 
 ```
-resilient_llm.py  ← core: Target / ResilientLLM / _Breaker / Scorecard
-chaos.py          ← BurstFault / RandomFault / BrownoutFault hooks
-demo.py           ← 3-scenario runner that prints the scorecard
-.env.example      ← credentials template
+resilient_llm.py    ← LLM core: Target / ResilientLLM / _Breaker / Scorecard
+resilient_mcp.py    ← MCP core: MCPTarget / ResilientMCP (reuses _Breaker, Scorecard)
+chaos.py            ← BurstFault / RandomFault / BrownoutFault (LLM)
+                      MCPToolFault / MCPTimeoutFault (MCP)
+demo.py             ← 3-scenario runner for the LLM side
+demo_mcp.py         ← 3-scenario runner for the MCP side (spawns local servers)
+mcp_demo_server.py  ← tiny FastMCP server with a lookup_status tool
+.env.example        ← credentials template
 ```
 
 ## How the chain configuration looks
