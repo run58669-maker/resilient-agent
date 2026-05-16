@@ -20,6 +20,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).parent
 VIDEO_DIR = ROOT / "video"
 LIVE = VIDEO_DIR / "segment_live.mp4"
+LIVE_MCP = VIDEO_DIR / "segment_live_mcp.mp4"
 SLIDES = VIDEO_DIR / "slides"
 OUTPUT = VIDEO_DIR / "submission.mp4"
 
@@ -66,10 +67,10 @@ def make_slide_video(image_path: Path, seconds: float, out: Path) -> Path:
     return out
 
 
-def trim_live(start: float, length: float, out: Path) -> Path:
-    """Trim the live capture and re-encode so concat works cleanly."""
+def trim_live(start: float, length: float, src: Path, out: Path) -> Path:
+    """Trim a live capture and re-encode so concat works cleanly."""
     subprocess.run([
-        "ffmpeg", "-y", "-ss", str(start), "-i", str(LIVE),
+        "ffmpeg", "-y", "-ss", str(start), "-i", str(src),
         "-t", str(length),
         "-c:v", "libx264", "-pix_fmt", "yuv420p",
         "-vf", f"scale={W}:{H}", "-r", str(FPS),
@@ -110,13 +111,24 @@ def main() -> None:
     )
     parts.append(make_slide_video(s2_png, 4.0, SLIDES / "s2.mp4"))
 
-    # Live demo trimmed: start a bit before the countdown ends, end after scorecard
-    parts.append(trim_live(start=4.0, length=25.0, out=SLIDES / "live.mp4"))
+    # Live LLM demo trimmed: start before countdown ends, end after scorecard
+    parts.append(trim_live(start=4.0, length=25.0, src=LIVE, out=SLIDES / "live_llm.mp4"))
+
+    # Bridge slide — same primitive applied to the MCP layer
+    s2b_png = slide(
+        "Same primitive, MCP side",
+        "ResilientMCP wraps tool calls across two MCP servers under chaos",
+        SLIDES / "s2b.png",
+    )
+    parts.append(make_slide_video(s2b_png, 4.0, SLIDES / "s2b.mp4"))
+
+    # Live MCP demo trimmed
+    parts.append(trim_live(start=4.0, length=25.0, src=LIVE_MCP, out=SLIDES / "live_mcp.mp4"))
 
     # Outro 1
     s3_png = slide(
         "100% success under chaos",
-        "p95 latency < 2s   ·   MTTR ~660ms   ·   Fallback survives gateway brownout",
+        "LLM + MCP, both legs   ·   p95 < 2s   ·   Fallback survives gateway brownout",
         SLIDES / "s3.png",
     )
     parts.append(make_slide_video(s3_png, 5.0, SLIDES / "s3.mp4"))
