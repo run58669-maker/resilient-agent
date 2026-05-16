@@ -8,3 +8,11 @@ __pycache__/
 
 # Reference repo we cloned for inspiration — not part of our submission
 voice_analyser_ref/
+
+# Video build intermediates; the rendered submission.mp4 is checked in.
+video/frames/
+video/sample_*.png
+video/test*.mp4
+video/segment_*.mp4
+video/ffmpeg.log
+video/demo_stdout.txt
